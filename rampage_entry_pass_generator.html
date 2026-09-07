@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RAMPAGE — Entry Pass Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;900&family=Cormorant+Garamond:ital,wght@1,600&family=Oswald:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --void: #050506;
+    --crimson: #7a0f18;
+    --crimson-bright: #c81428;
+    --gold: #d4af37;
+    --gold-bright: #f4d675;
+    --paper: #f0e9d8;
+    --steel: #8a8a92;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Oswald', sans-serif;
+    background: var(--void);
+    color: var(--paper);
+    min-height: 100vh;
+    padding: 32px 20px 100px;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  header {
+    border-bottom: 2px solid var(--gold);
+    padding-bottom: 20px;
+    margin-bottom: 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  h1 {
+    font-family: 'Cinzel', serif;
+    font-weight: 900;
+    font-size: 40px;
+    letter-spacing: 2px;
+    margin: 0;
+    background: linear-gradient(180deg, var(--gold-bright), var(--gold) 60%, #8a6d1f);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .subtitle { color: var(--steel); font-size: 12px; margin-top: 8px; letter-spacing: 2px; text-transform: uppercase; }
+  .count-badge {
+    background: var(--crimson-bright);
+    color: var(--paper);
+    font-weight: 700;
+    padding: 8px 16px;
+    font-size: 13px;
+    letter-spacing: 1px;
+    font-family: 'Oswald', sans-serif;
+    text-transform: uppercase;
+  }
+
+  /* ===== FORM ===== */
+  .form-card {
+    background: linear-gradient(160deg, #0d0d0f 0%, #0a0505 100%);
+    border: 1px solid rgba(212,175,55,0.35);
+    padding: 28px;
+    margin-bottom: 40px;
+  }
+  .form-title {
+    font-family: 'Cinzel', serif;
+    font-size: 15px;
+    letter-spacing: 2px;
+    color: var(--gold-bright);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .form-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  .field { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 6px; }
+  .field label {
+    font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--crimson-bright); font-weight: 700;
+  }
+  .field input, .field select {
+    background: #16161a;
+    border: 1px solid #333;
+    color: var(--paper);
+    padding: 12px 14px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 14px;
+  }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--gold); }
+  .form-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+  .form-msg { font-size: 12px; color: var(--steel); }
+  .form-msg.error { color: var(--crimson-bright); }
+
+  button {
+    font-family: 'Oswald', sans-serif;
+    background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+    color: #1a1204;
+    border: none;
+    padding: 14px 26px;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  button:hover { filter: brightness(1.1); }
+  button:disabled { background: #3a3a3f; color: #888; cursor: not-allowed; }
+  button.secondary { background: transparent; color: var(--paper); border: 2px solid #333; }
+  button.secondary:hover { border-color: var(--gold); }
+  button.danger { background: transparent; color: var(--crimson-bright); border: 2px solid var(--crimson); }
+  button.danger:hover { border-color: var(--crimson-bright); }
+
+  /* ===== LATEST PASS PREVIEW (image, not a live card) ===== */
+  .latest-section { margin-bottom: 40px; }
+  .section-title {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    letter-spacing: 2px;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    border-bottom: 1px solid rgba(212,175,55,0.25);
+    padding-bottom: 8px;
+  }
+  .latest-preview { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+  .latest-preview img {
+    width: 200px;
+    border: 2px solid var(--gold);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+  }
+  .latest-meta { display: flex; flex-direction: column; gap: 8px; }
+  .latest-meta .name { font-family: 'Cormorant Garamond', serif; font-style: italic; font-weight: 600; font-size: 24px; color: var(--gold-bright); }
+  .latest-meta .id { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--paper); letter-spacing: 1px; }
+  .empty-state { color: var(--steel); font-size: 13px; font-style: italic; }
+
+  /* ===== GALLERY (lightweight thumbnails, not full cards) ===== */
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 14px;
+  }
+  .thumb { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .thumb img {
+    width: 100%;
+    border: 1px solid rgba(212,175,55,0.4);
+    cursor: pointer;
+  }
+  .thumb .thumb-name { font-size: 11px; color: var(--paper); text-align: center; line-height: 1.2; }
+  .thumb .thumb-id { font-size: 9px; font-family: 'JetBrains Mono', monospace; color: var(--steel); }
+  .thumb button {
+    padding: 6px 0; font-size: 9px; width: 100%;
+  }
+
+  /* ===== off-screen capture zone (renders the real pass for html2canvas, never shown) ===== */
+  #capture-zone { position: absolute; left: -9999px; top: 0; }
+
+  /* ===== THE PASS (used only inside the hidden capture zone) ===== */
+  .pass {
+    width: 380px;
+    height: 700px;
+    position: relative;
+    background:
+      radial-gradient(ellipse 500px 400px at 78% 30%, rgba(200,20,40,0.35), transparent 60%),
+      radial-gradient(ellipse 400px 500px at 20% 90%, rgba(122,15,24,0.3), transparent 65%),
+      linear-gradient(160deg, #0a0a0c 0%, #050506 55%, #0d0505 100%);
+    border: 2px solid var(--gold);
+    box-shadow:
+      0 0 0 1px rgba(212,175,55,0.25),
+      0 20px 50px rgba(0,0,0,0.6),
+      inset 0 0 60px rgba(200,20,40,0.08);
+    overflow: hidden;
+    padding: 26px 24px 22px;
+    display: flex;
+    flex-direction: column;
+  }
+  .sheen {
+    position: absolute; inset: 0;
+    background: linear-gradient(115deg, transparent 40%, rgba(244,214,117,0.10) 48%, rgba(244,214,117,0.18) 50%, rgba(244,214,117,0.10) 52%, transparent 60%);
+    pointer-events: none;
+    z-index: 3;
+  }
+  .web-motif { position: absolute; top: -60px; right: -60px; width: 300px; height: 300px; z-index: 0; opacity: 0.55; }
+  .web-motif-soft { position: absolute; bottom: -80px; left: -80px; width: 240px; height: 240px; z-index: 0; opacity: 0.22; transform: rotate(200deg); }
+  .content { position: relative; z-index: 2; display: flex; flex-direction: column; height: 100%; }
+  .top-row { display: flex; justify-content: space-between; align-items: flex-start; }
+  .fest-logo { font-family: 'Cinzel', serif; font-weight: 900; font-size: 15px; letter-spacing: 3px; color: var(--gold-bright); }
+  .fest-logo span { color: var(--crimson-bright); }
+  .pass-type-tag { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; color: #1a1204; background: var(--gold); padding: 4px 9px; text-transform: uppercase; }
+  .entry-pass-title {
+    font-family: 'Cinzel', serif; font-weight: 900; font-size: 34px; letter-spacing: 3px; margin-top: 18px;
+    background: linear-gradient(180deg, var(--gold-bright) 20%, var(--gold) 55%, #7a5f1a 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 30px rgba(212,175,55,0.25); line-height: 1;
+  }
+  .event-name { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 12px; letter-spacing: 3px; color: var(--paper); text-transform: uppercase; margin-top: 8px; opacity: 0.85; }
+  .divider { height: 1px; background: linear-gradient(90deg, var(--gold) 0%, rgba(212,175,55,0.15) 60%, transparent 100%); margin: 16px 0 14px; }
+  .info-block { display: flex; flex-direction: column; gap: 9px; margin-top: 4px; }
+  .info-row { display: flex; flex-direction: column; gap: 1px; }
+  .info-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--crimson-bright); font-weight: 700; }
+  .info-value { font-size: 15px; color: var(--paper); font-weight: 500; font-family: 'Oswald', sans-serif; border-bottom: 1px solid rgba(212,175,55,0.2); padding-bottom: 4px; }
+  .name-row { margin-bottom: 4px; }
+  .participant-name {
+    font-family: 'Cormorant Garamond', serif; font-style: italic; font-weight: 600; font-size: 30px; line-height: 1.1; letter-spacing: 0.5px;
+    background: linear-gradient(180deg, var(--gold-bright) 15%, var(--gold) 55%, #9c7a22 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 22px rgba(212,175,55,0.3); border-bottom: none; padding-bottom: 6px; position: relative;
+  }
+  .participant-name::after { content: ''; display: block; width: 46px; height: 2px; margin-top: 6px; background: linear-gradient(90deg, var(--gold-bright), transparent); }
+  .bottom-area { margin-top: auto; display: flex; align-items: center; gap: 14px; }
+  .qr-frame { position: relative; width: 92px; height: 92px; background: var(--paper); padding: 6px; flex-shrink: 0; }
+  .qr-corner-tl, .qr-corner-br { content: ''; position: absolute; width: 14px; height: 14px; border-color: var(--gold-bright); }
+  .qr-corner-tl { top: -4px; left: -4px; border-top: 2px solid var(--gold-bright); border-left: 2px solid var(--gold-bright); }
+  .qr-corner-br { bottom: -4px; right: -4px; border-bottom: 2px solid var(--gold-bright); border-right: 2px solid var(--gold-bright); }
+  .qr-frame img, .qr-frame canvas { width: 80px; height: 80px; }
+  .id-block { flex: 1; }
+  .scan-label { font-size: 8px; letter-spacing: 1.5px; color: var(--steel); text-transform: uppercase; margin-bottom: 6px; }
+  .pass-id-label { font-size: 9px; letter-spacing: 2px; color: var(--crimson-bright); font-weight: 700; text-transform: uppercase; }
+  .pass-id-value { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--gold-bright); letter-spacing: 1.5px; margin-top: 3px; }
+  .footer-banner { margin-top: 16px; text-align: center; font-family: 'Cinzel', serif; font-size: 10px; letter-spacing: 4px; color: var(--gold); text-transform: uppercase; border-top: 1px solid rgba(212,175,55,0.35); padding-top: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>RAMPAGE</h1>
+      <div class="subtitle">Entry Pass Generator — The Fresher Night</div>
+    </div>
+    <div class="count-badge" id="countBadge">0 GENERATED</div>
+  </header>
+
+  <div class="form-card">
+    <div class="form-title">Enter Fresher Details</div>
+    <div class="form-row">
+      <div class="field">
+        <label for="nameInput">Full Name</label>
+        <input id="nameInput" type="text" placeholder="e.g. Prakhar Sharan" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="yearInput">Pass Type</label>
+        <select id="yearInput">
+          <option value="FRESHER">Fresher</option>
+          <option value="2ND YEAR">2nd Year</option>
+          <option value="3RD YEAR">3rd Year</option>
+          <option value="FINAL YEAR">Final Year</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label for="phoneInput">Phone Number</label>
+        <input id="phoneInput" type="tel" placeholder="e.g. 9140343403" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="emailInput">Email</label>
+        <input id="emailInput" type="email" placeholder="e.g. name@example.com" autocomplete="off">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button id="generateBtn">Generate Pass</button>
+      <button id="zipBtn" class="secondary" disabled>Download All as ZIP</button>
+      <button id="clearAllBtn" class="danger" disabled>Clear Session</button>
+      <span class="form-msg" id="formMsg"></span>
+    </div>
+  </div>
+
+  <div class="latest-section">
+    <div class="section-title">Latest Pass</div>
+    <div id="latestPreview"><div class="empty-state">No pass generated yet — fill the form above and click Generate Pass.</div></div>
+  </div>
+
+  <div class="latest-section">
+    <div class="section-title">Session History</div>
+    <div class="gallery" id="gallery"></div>
+  </div>
+</div>
+
+<div id="capture-zone"></div>
+
+<script>
+// ===== SUPABASE CONFIG — fill these in with your project's values =====
+// Project Settings → API → Project URL, and the "Publishable" (anon) key.
+// Never put the "Secret" key here — this file runs in the browser.
+const SUPABASE_URL = 'PASTE_YOUR_PROJECT_URL_HERE';
+const SUPABASE_ANON_KEY = 'PASTE_YOUR_PUBLISHABLE_KEY_HERE';
+const TABLE_NAME = 'whatsapp_sales';
+
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const generated = []; // { name, year, code, dataUrl }
+const usedCodes = new Set();
+
+const nameInput = document.getElementById('nameInput');
+const yearInput = document.getElementById('yearInput');
+const phoneInput = document.getElementById('phoneInput');
+const emailInput = document.getElementById('emailInput');
+const generateBtn = document.getElementById('generateBtn');
+const zipBtn = document.getElementById('zipBtn');
+const clearAllBtn = document.getElementById('clearAllBtn');
+const formMsg = document.getElementById('formMsg');
+const countBadge = document.getElementById('countBadge');
+const latestPreview = document.getElementById('latestPreview');
+const gallery = document.getElementById('gallery');
+const captureZone = document.getElementById('capture-zone');
+
+function safeFileName(name) { return name.trim().replace(/[^a-z0-9]+/gi, '_'); }
+function formatSerial(code) { return 'RMP-' + code.match(/.{1,4}/g).join('-'); }
+
+function randomCode() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(4)))
+    .map(b => b.toString(16).padStart(2, '0').toUpperCase())
+    .join('');
+}
+
+// Checks the code against Supabase (not just this session) so two different
+// browsers/devices never generate a duplicate.
+async function generateUniqueCode() {
+  let code;
+  let exists = true;
+  while (exists) {
+    code = randomCode();
+    if (usedCodes.has(code)) continue;
+    const { data, error } = await supabaseClient
+      .from(TABLE_NAME)
+      .select('code')
+      .eq('code', code)
+      .limit(1);
+    if (error) {
+      // If the check itself fails (e.g. network hiccup), fall back to the
+      // local session check rather than blocking generation entirely.
+      exists = false;
+    } else {
+      exists = data && data.length > 0;
+    }
+  }
+  usedCodes.add(code);
+  return code;
+}
+
+function webSVG(id, glowColor) {
+  const spokes = [];
+  const cx = 160, cy = 160, spokeCount = 9, maxR = 210;
+  for (let i = 0; i < spokeCount; i++) {
+    const angle = (Math.PI / 2) * (i / (spokeCount - 1));
+    const x = cx - maxR * Math.cos(angle);
+    const y = cy - maxR * Math.sin(angle);
+    spokes.push(`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" />`);
+  }
+  const rings = [];
+  for (let r = 30; r <= 200; r += 34) {
+    const pts = [];
+    for (let i = 0; i < spokeCount; i++) {
+      const angle = (Math.PI / 2) * (i / (spokeCount - 1));
+      const x = cx - r * Math.cos(angle);
+      const y = cy - r * Math.sin(angle);
+      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+    }
+    rings.push(`<polyline points="${pts.join(' ')}" />`);
+  }
+  return `
+  <svg viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="glow-${id}" cx="100%" cy="0%" r="80%">
+        <stop offset="0%" stop-color="${glowColor}" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="${glowColor}" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="thread-${id}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#f4d675"/>
+        <stop offset="100%" stop-color="#d4af37" stop-opacity="0.35"/>
+      </linearGradient>
+    </defs>
+    <circle cx="160" cy="160" r="180" fill="url(#glow-${id})"/>
+    <g transform="translate(0,0)" stroke="url(#thread-${id})" stroke-width="1" fill="none" opacity="0.8">
+      ${spokes.join('\n      ')}
+      ${rings.join('\n      ')}
+    </g>
+  </svg>`;
+}
+
+function buildPassHTML(name, year, code, uid) {
+  const heroSVG = webSVG('main-' + uid, '#c81428');
+  const softWebSVG = webSVG('soft-' + uid, '#7a0f18');
+  return `
+    <div class="pass" id="pass-${uid}">
+      <div class="web-motif">${heroSVG}</div>
+      <div class="web-motif-soft">${softWebSVG}</div>
+      <div class="sheen"></div>
+      <div class="content">
+        <div class="top-row">
+          <div class="fest-logo">RAMPAGE<span>.</span></div>
+          <div class="pass-type-tag">General Access</div>
+        </div>
+        <div class="entry-pass-title">ENTRY<br>PASS</div>
+        <div class="event-name">The Fresher Night — Lucknow University</div>
+        <div class="divider"></div>
+        <div class="info-block">
+          <div class="info-row name-row"><div class="info-label">Name</div><div class="participant-name">${name}</div></div>
+          <div class="info-row"><div class="info-label">Pass Type</div><div class="info-value">${year}</div></div>
+          <div class="info-row"><div class="info-label">Date</div><div class="info-value">18 September</div></div>
+          <div class="info-row"><div class="info-label">Time</div><div class="info-value">Gates 3:00 PM · Show 7:00 PM</div></div>
+          <div class="info-row"><div class="info-label">Venue</div><div class="info-value">BOOM BOX</div></div>
+        </div>
+        <div class="bottom-area">
+          <div class="qr-frame">
+            <div class="qr-corner-tl"></div><div class="qr-corner-br"></div>
+            <div id="qr-${uid}"></div>
+          </div>
+          <div class="id-block">
+            <div class="scan-label">Scan to verify</div>
+            <div class="pass-id-label">Pass ID</div>
+            <div class="pass-id-value">${formatSerial(code)}</div>
+          </div>
+        </div>
+        <div class="footer-banner">Authorized Entry Only</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderLatest(entry) {
+  latestPreview.innerHTML = `
+    <div class="latest-preview">
+      <img src="${entry.dataUrl}" alt="${entry.name} pass">
+      <div class="latest-meta">
+        <div class="name">${entry.name}</div>
+        <div class="id">${formatSerial(entry.code)} · ${entry.year}</div>
+        <button id="downloadLatestBtn">Download Pass</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('downloadLatestBtn').onclick = () => downloadEntry(entry);
+}
+
+function addToGallery(entry) {
+  const thumb = document.createElement('div');
+  thumb.className = 'thumb';
+  thumb.innerHTML = `
+    <img src="${entry.dataUrl}" alt="${entry.name}">
+    <div class="thumb-name">${entry.name}</div>
+    <div class="thumb-id">${formatSerial(entry.code)}</div>
+    <button>Download</button>
+  `;
+  thumb.querySelector('button').onclick = () => downloadEntry(entry);
+  thumb.querySelector('img').onclick = () => renderLatest(entry);
+  gallery.prepend(thumb);
+}
+
+function downloadEntry(entry) {
+  const a = document.createElement('a');
+  a.href = entry.dataUrl;
+  a.download = `${safeFileName(entry.name)}_${entry.code}_entrypass.png`;
+  a.click();
+}
+
+async function generatePass() {
+  const name = nameInput.value.trim();
+  const year = yearInput.value;
+  const phone = phoneInput.value.trim();
+  const email = emailInput.value.trim();
+  formMsg.textContent = '';
+  formMsg.classList.remove('error');
+
+  if (!name) {
+    formMsg.textContent = 'Please enter a name.';
+    formMsg.classList.add('error');
+    nameInput.focus();
+    return;
+  }
+
+  generateBtn.disabled = true;
+  formMsg.textContent = 'Checking database…';
+
+  let code;
+  try {
+    code = await generateUniqueCode();
+  } catch (e) {
+    formMsg.textContent = 'Could not reach the database. Check your connection and try again.';
+    formMsg.classList.add('error');
+    generateBtn.disabled = false;
+    return;
+  }
+
+  // Save to Supabase FIRST — this is now the source of truth. Only build
+  // the visual pass once the record is safely stored.
+  formMsg.textContent = 'Saving to database…';
+  const { error: insertError } = await supabaseClient
+    .from(TABLE_NAME)
+    .insert([{ name, phone, email, year, code, used: false, emailed: false }]);
+
+  if (insertError) {
+    formMsg.textContent = 'Could not save to database — pass not generated. ' + insertError.message;
+    formMsg.classList.add('error');
+    generateBtn.disabled = false;
+    return;
+  }
+
+  formMsg.textContent = 'Generating pass…';
+  const uid = 'gen' + Date.now();
+
+  // Render into the hidden capture zone only — never left visible on the page
+  captureZone.innerHTML = buildPassHTML(name, year, code, uid);
+  new QRCode(document.getElementById(`qr-${uid}`), {
+    text: code, width: 80, height: 80, colorDark: "#0a0a0c", colorLight: "#f0e9d8"
+  });
+
+  // small delay so the QR canvas paints before capture
+  await new Promise(r => setTimeout(r, 80));
+
+  const passEl = document.getElementById(`pass-${uid}`);
+  const canvas = await html2canvas(passEl, { scale: 2, backgroundColor: null });
+  const dataUrl = canvas.toDataURL('image/png');
+
+  // wipe the capture zone immediately — no lingering card in the DOM
+  captureZone.innerHTML = '';
+
+  const entry = { name, year, phone, email, code, dataUrl };
+  generated.push(entry);
+
+  renderLatest(entry);
+  addToGallery(entry);
+
+  countBadge.textContent = `${generated.length} GENERATED`;
+  zipBtn.disabled = false;
+  clearAllBtn.disabled = false;
+
+  formMsg.textContent = 'Pass generated and saved.';
+  generateBtn.disabled = false;
+  nameInput.value = '';
+  phoneInput.value = '';
+  emailInput.value = '';
+  nameInput.focus();
+}
+
+async function downloadZip() {
+  formMsg.textContent = 'Building ZIP…';
+  const zip = new JSZip();
+  generated.forEach(entry => {
+    const base64 = entry.dataUrl.split(',')[1];
+    zip.file(`${safeFileName(entry.name)}_${entry.code}_entrypass.png`, base64, { base64: true });
+  });
+  const content = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(content);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'rampage_entry_passes.zip';
+  a.click();
+  formMsg.textContent = 'ZIP downloaded.';
+}
+
+function clearSession() {
+  if (!confirm('Clear all generated passes from this session? This cannot be undone.')) return;
+  generated.length = 0;
+  usedCodes.clear();
+  gallery.innerHTML = '';
+  latestPreview.innerHTML = '<div class="empty-state">No pass generated yet — fill the form above and click Generate Pass.</div>';
+  countBadge.textContent = '0 GENERATED';
+  zipBtn.disabled = true;
+  clearAllBtn.disabled = true;
+  formMsg.textContent = 'Session cleared.';
+}
+
+generateBtn.addEventListener('click', generatePass);
+zipBtn.addEventListener('click', downloadZip);
+clearAllBtn.addEventListener('click', clearSession);
+nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') generatePass(); });
+</script>
+</body>
+</html>
