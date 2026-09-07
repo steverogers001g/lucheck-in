@@ -273,7 +273,8 @@
   </div>
 
   <div class="latest-section">
-    <div class="section-title">Session History</div>
+    <div class="section-title">All Passes</div>
+    <div class="form-msg" id="loadStatus" style="margin-bottom:10px;"></div>
     <div class="gallery" id="gallery"></div>
   </div>
 </div>
@@ -304,6 +305,7 @@ const formMsg = document.getElementById('formMsg');
 const countBadge = document.getElementById('countBadge');
 const latestPreview = document.getElementById('latestPreview');
 const gallery = document.getElementById('gallery');
+const loadStatus = document.getElementById('loadStatus');
 const captureZone = document.getElementById('capture-zone');
 
 function safeFileName(name) { return name.trim().replace(/[^a-z0-9]+/gi, '_'); }
@@ -399,9 +401,9 @@ function buildPassHTML(name, year, code, uid) {
         <div class="info-block">
           <div class="info-row name-row"><div class="info-label">Name</div><div class="participant-name">${name}</div></div>
           <div class="info-row"><div class="info-label">Pass Type</div><div class="info-value">${year}</div></div>
-          <div class="info-row"><div class="info-label">Date</div><div class="info-value">18 September</div></div>
-          <div class="info-row"><div class="info-label">Time</div><div class="info-value">Gates 3:00 PM · Show 7:00 PM</div></div>
-          <div class="info-row"><div class="info-label">Venue</div><div class="info-value">BOOM BOX</div></div>
+          <div class="info-row"><div class="info-label">Date</div><div class="info-value">22 September</div></div>
+          <div class="info-row"><div class="info-label">Time</div><div class="info-value">Gates 2:00 PM · Show 6:00 PM</div></div>
+          <div class="info-row"><div class="info-label">Venue</div><div class="info-value">THE WING'S FIRE</div></div>
         </div>
         <div class="bottom-area">
           <div class="qr-frame">
@@ -418,6 +420,22 @@ function buildPassHTML(name, year, code, uid) {
       </div>
     </div>
   `;
+}
+
+// Renders a person's data into the hidden capture zone, waits for the QR to
+// paint, snapshots it to a PNG data URL, then wipes the capture zone again.
+async function renderPassToDataUrl(name, year, code) {
+  const uid = 'gen' + Date.now() + Math.floor(Math.random() * 1000);
+  captureZone.innerHTML = buildPassHTML(name, year, code, uid);
+  new QRCode(document.getElementById(`qr-${uid}`), {
+    text: code, width: 80, height: 80, colorDark: "#0a0a0c", colorLight: "#f0e9d8"
+  });
+  await new Promise(r => setTimeout(r, 80));
+  const passEl = document.getElementById(`pass-${uid}`);
+  const canvas = await html2canvas(passEl, { scale: 2, backgroundColor: null });
+  const dataUrl = canvas.toDataURL('image/png');
+  captureZone.innerHTML = '';
+  return dataUrl;
 }
 
 function renderLatest(entry) {
@@ -498,23 +516,7 @@ async function generatePass() {
   }
 
   formMsg.textContent = 'Generating pass…';
-  const uid = 'gen' + Date.now();
-
-  // Render into the hidden capture zone only — never left visible on the page
-  captureZone.innerHTML = buildPassHTML(name, year, code, uid);
-  new QRCode(document.getElementById(`qr-${uid}`), {
-    text: code, width: 80, height: 80, colorDark: "#0a0a0c", colorLight: "#f0e9d8"
-  });
-
-  // small delay so the QR canvas paints before capture
-  await new Promise(r => setTimeout(r, 80));
-
-  const passEl = document.getElementById(`pass-${uid}`);
-  const canvas = await html2canvas(passEl, { scale: 2, backgroundColor: null });
-  const dataUrl = canvas.toDataURL('image/png');
-
-  // wipe the capture zone immediately — no lingering card in the DOM
-  captureZone.innerHTML = '';
+  const dataUrl = await renderPassToDataUrl(name, year, code);
 
   const entry = { name, year, phone, email, code, dataUrl };
   generated.push(entry);
@@ -551,21 +553,59 @@ async function downloadZip() {
 }
 
 function clearSession() {
-  if (!confirm('Clear all generated passes from this session? This cannot be undone.')) return;
+  if (!confirm('Hide all passes from this view? This does NOT delete anyone from the database — they will reappear next time the page loads. Continue?')) return;
   generated.length = 0;
-  usedCodes.clear();
   gallery.innerHTML = '';
   latestPreview.innerHTML = '<div class="empty-state">No pass generated yet — fill the form above and click Generate Pass.</div>';
   countBadge.textContent = '0 GENERATED';
   zipBtn.disabled = true;
   clearAllBtn.disabled = true;
-  formMsg.textContent = 'Session cleared.';
+  formMsg.textContent = 'View cleared (database unchanged).';
+}
+
+// Load everyone already saved in Supabase and rebuild their pass thumbnails,
+// so the page never opens empty — this is what makes passes "always there."
+async function loadExisting() {
+  loadStatus.textContent = 'Loading saved passes…';
+  const { data, error } = await supabaseClient
+    .from(TABLE_NAME)
+    .select('name, phone, email, year, code, created_at')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    loadStatus.textContent = 'Could not load saved passes: ' + error.message;
+    loadStatus.classList.add('error');
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    loadStatus.textContent = '';
+    return;
+  }
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    loadStatus.textContent = `Loading saved passes… (${i + 1}/${data.length})`;
+    usedCodes.add(row.code);
+    const dataUrl = await renderPassToDataUrl(row.name, row.year, row.code);
+    const entry = { name: row.name, year: row.year, phone: row.phone, email: row.email, code: row.code, dataUrl };
+    generated.push(entry);
+    addToGallery(entry);
+  }
+
+  renderLatest(generated[generated.length - 1]);
+  countBadge.textContent = `${generated.length} GENERATED`;
+  zipBtn.disabled = false;
+  clearAllBtn.disabled = false;
+  loadStatus.textContent = '';
 }
 
 generateBtn.addEventListener('click', generatePass);
 zipBtn.addEventListener('click', downloadZip);
 clearAllBtn.addEventListener('click', clearSession);
 nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') generatePass(); });
+
+loadExisting();
 </script>
 </body>
 </html>
