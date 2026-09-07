@@ -193,8 +193,7 @@
   .pass-type-tag { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; color: #1a1204; background: var(--gold); padding: 4px 9px; text-transform: uppercase; }
   .entry-pass-title {
     font-family: 'Cinzel', serif; font-weight: 900; font-size: 34px; letter-spacing: 3px; margin-top: 18px;
-    background: linear-gradient(180deg, var(--gold-bright) 20%, var(--gold) 55%, #7a5f1a 100%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
+    color: var(--gold-bright);
     text-shadow: 0 0 30px rgba(212,175,55,0.25); line-height: 1;
   }
   .event-name { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 12px; letter-spacing: 3px; color: var(--paper); text-transform: uppercase; margin-top: 8px; opacity: 0.85; }
@@ -206,8 +205,7 @@
   .name-row { margin-bottom: 4px; }
   .participant-name {
     font-family: 'Cormorant Garamond', serif; font-style: italic; font-weight: 600; font-size: 30px; line-height: 1.1; letter-spacing: 0.5px;
-    background: linear-gradient(180deg, var(--gold-bright) 15%, var(--gold) 55%, #9c7a22 100%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
+    color: var(--gold-bright);
     text-shadow: 0 0 22px rgba(212,175,55,0.3); border-bottom: none; padding-bottom: 6px; position: relative;
   }
   .participant-name::after { content: ''; display: block; width: 46px; height: 2px; margin-top: 6px; background: linear-gradient(90deg, var(--gold-bright), transparent); }
@@ -286,8 +284,8 @@
 // ===== SUPABASE CONFIG — fill these in with your project's values =====
 // Project Settings → API → Project URL, and the "Publishable" (anon) key.
 // Never put the "Secret" key here — this file runs in the browser.
-const SUPABASE_URL = 'PASTE_YOUR_PROJECT_URL_HERE';
-const SUPABASE_ANON_KEY = 'PASTE_YOUR_PUBLISHABLE_KEY_HERE';
+const SUPABASE_URL = 'https://moxthliymydjkqyyuilz.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_bU_J4HuaDTGi7LV75uXhFA_Zwrywic_';
 const TABLE_NAME = 'whatsapp_sales';
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
